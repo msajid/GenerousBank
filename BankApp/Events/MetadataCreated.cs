@@ -1,6 +1,7 @@
 ﻿using BankApp.Models;
 using Newtonsoft.Json;
 using System;
+using System.Globalization;
 
 namespace BankApp.Events
 {
@@ -11,9 +12,34 @@ namespace BankApp.Events
         public int Version { get; set; }
         public string EventType { get; set; } = nameof(MetadataCreated);
         public DateTime Timestamp { get; set; }
-        public Metada Payload { get; set; }
+        public Metadata Payload { get; set; }
 
         [JsonProperty("_etag")]
         public string Etag { get; set; }
+
+        public static MetadataCreated Create(Metadata metadata, int version)
+        {
+            return new MetadataCreated()
+            {
+                Payload = metadata,
+                EventType = nameof(MetadataCreated),
+                Version = version,
+                Timestamp = DateTime.UtcNow,
+                PartitionKey = metadata?.AccountNumber
+            };
+        }
+
+        public static MetadataCreated Clone(MetadataCreated original)
+        {
+            return new MetadataCreated()
+            {
+                Id = original.Id,
+                Payload = original.Payload,
+                EventType = nameof(MetadataCreated),
+                Version = original.Version,
+                Timestamp = DateTime.UtcNow,
+                PartitionKey = original.PartitionKey,
+            };
+        }
     }
 }

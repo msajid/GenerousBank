@@ -4,11 +4,10 @@ using System.Text;
 
 namespace BankApp.Models
 {
-    public class Metada
+    public class Metadata
     {
         public string AccountNumber { get; set; }
-        public int LastSnapshot { get; set; }
         public int LastSequence { get; set; }
-
+       
     }
 }

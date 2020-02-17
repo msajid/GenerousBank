@@ -20,7 +20,10 @@ namespace BankApp.Actors
         private readonly CosmosClient cosmosClient;
 
         [JsonProperty("state")]
-        public State State { get; set; }
+        public MetadataCreated State { get; set; }
+
+        [JsonProperty("balance")]
+        public int Balance { get; set; }
 
         public AccountHandler(CosmosClient cosmosClient)
         {
@@ -30,26 +33,27 @@ namespace BankApp.Actors
         {
             ValidateMatchingAccountNumberAndEntityKey(account?.AccountNumber);
 
-            var accountCreatedEvent = AccountCreated.Create(account, State.Metadata.Payload.LastSequence + 1);
+            var accountCreatedEvent = AccountCreated.Create(account, State.Payload.LastSequence + 1);
 
-            State.Metadata.Payload.LastSequence = accountCreatedEvent.Version;
+            MetadataCreated newState = MetadataCreated.Clone(State);
+
+            newState.Payload.LastSequence = accountCreatedEvent.Version;
 
             var batchOptions = new TransactionalBatchItemRequestOptions()
             {
-                IfMatchEtag = State.Metadata.Etag
+                IfMatchEtag = State.Etag
             };
 
             Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
             var batch = container.CreateTransactionalBatch(new PartitionKey(Entity.Current.EntityKey))
-                                 .ReplaceItem<MetadataCreated>(State.Metadata.Id, State.Metadata, batchOptions)
+                                 .ReplaceItem<MetadataCreated>(newState.Id, newState, batchOptions)
                                  .UpsertItem<AccountCreated>(accountCreatedEvent);
 
             var transactionResult = await batch.ExecuteAsync().ConfigureAwait(false);
 
             if (transactionResult.IsSuccessStatusCode)
             {
-                State.Metadata = transactionResult.GetOperationResultAtIndex<MetadataCreated>(0).Resource;
-                State.Account = transactionResult.GetOperationResultAtIndex<AccountCreated>(1).Resource;
+                State = transactionResult.GetOperationResultAtIndex<MetadataCreated>(0).Resource;
             }
             else
             {
@@ -62,18 +66,20 @@ namespace BankApp.Actors
         {
             ValidateMatchingAccountNumberAndEntityKey(deposit?.AccountNumber);
 
-            var depositPerformedEvent = DepositPerformed.Create(deposit, State.Metadata.Payload.LastSequence + 1);
+            var depositPerformedEvent = DepositPerformed.Create(deposit, State.Payload.LastSequence + 1);
 
-            State.Metadata.Payload.LastSequence = depositPerformedEvent.Version;
+            MetadataCreated newState = MetadataCreated.Clone(State);
+            newState.Payload.LastSequence = depositPerformedEvent.Version;
+
 
             var batchOptions = new TransactionalBatchItemRequestOptions()
             {
-                IfMatchEtag = State.Metadata.Etag
+                IfMatchEtag = State.Etag
             };
 
             Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
             var batch = container.CreateTransactionalBatch(new PartitionKey(Entity.Current.EntityKey))
-                                 .ReplaceItem<MetadataCreated>(State.Metadata.Id, State.Metadata, batchOptions)
+                                 .ReplaceItem<MetadataCreated>(newState.Id, newState, batchOptions)
                                  .UpsertItem<DepositPerformed>(depositPerformedEvent);
 
             TransactionalBatchResponse transactionResult = await batch.ExecuteAsync()
@@ -81,9 +87,9 @@ namespace BankApp.Actors
 
             if (transactionResult.IsSuccessStatusCode)
             {
-                State.Metadata = transactionResult.GetOperationResultAtIndex<MetadataCreated>(0).Resource;
+                State = transactionResult.GetOperationResultAtIndex<MetadataCreated>(0).Resource;
                 var depositPersisted = transactionResult.GetOperationResultAtIndex<DepositPerformed>(1).Resource;
-                State.Balance += depositPersisted.Payload.Amount;
+                Balance += depositPersisted.Payload.Amount;
             }
             else
             {
@@ -97,18 +103,19 @@ namespace BankApp.Actors
 
             ValidateMatchingAccountNumberAndEntityKey(withdraw?.AccountNumber);
 
-            var withdrawPerformedEvent = WithdrawPerformed.Create(withdraw, State.Metadata.Payload.LastSequence + 1);
+            var withdrawPerformedEvent = WithdrawPerformed.Create(withdraw, State.Payload.LastSequence + 1);
 
-            State.Metadata.Payload.LastSequence = withdrawPerformedEvent.Version;
+            MetadataCreated newState = MetadataCreated.Clone(State);
+            newState.Payload.LastSequence = withdrawPerformedEvent.Version;
 
             var batchOptions = new TransactionalBatchItemRequestOptions()
             {
-                IfMatchEtag = State.Metadata.Etag
+                IfMatchEtag = State.Etag
             };
 
             Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
             var batch = container.CreateTransactionalBatch(new PartitionKey(Entity.Current.EntityKey))
-                                 .ReplaceItem<MetadataCreated>(State.Metadata.Id, State.Metadata, batchOptions)
+                                 .ReplaceItem<MetadataCreated>(newState.Id, newState, batchOptions)
                                  .UpsertItem<WithdrawPerformed>(withdrawPerformedEvent);
 
             TransactionalBatchResponse transactionResult = await batch.ExecuteAsync()
@@ -116,9 +123,9 @@ namespace BankApp.Actors
 
             if (transactionResult.IsSuccessStatusCode)
             {
-                State.Metadata = transactionResult.GetOperationResultAtIndex<MetadataCreated>(0).Resource;
+                State = transactionResult.GetOperationResultAtIndex<MetadataCreated>(0).Resource;
                 var withdrawPersisted = transactionResult.GetOperationResultAtIndex<WithdrawPerformed>(1).Resource;
-                State.Balance -= withdrawPersisted.Payload.Amount;
+                Balance -= withdrawPersisted.Payload.Amount;
             }
             else
             {
@@ -126,8 +133,38 @@ namespace BankApp.Actors
             }
         }
 
+        public async Task CreateSnapshot()
+        {
+            Snapshot snapshot = new Snapshot() { Balance = Balance, AccountNumber = State.Payload.AccountNumber };
+            var snapshotCreatedEvent = SnapshotCreated.Create(snapshot, State.Payload.LastSequence + 1);
 
+            MetadataCreated newState = MetadataCreated.Clone(State);
+            newState.Payload.LastSequence = snapshotCreatedEvent.Version;
 
+            var batchOptions = new TransactionalBatchItemRequestOptions()
+            {
+                IfMatchEtag = State.Etag
+            };
+
+            Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
+            var batch = container.CreateTransactionalBatch(new PartitionKey(Entity.Current.EntityKey))
+                                 .ReplaceItem<MetadataCreated>(newState.Id, newState, batchOptions)
+                                 .UpsertItem<SnapshotCreated>(snapshotCreatedEvent);
+
+            TransactionalBatchResponse transactionResult = await batch.ExecuteAsync()
+                                                                      .ConfigureAwait(false);
+
+            if (transactionResult.IsSuccessStatusCode)
+            {
+                State = transactionResult.GetOperationResultAtIndex<MetadataCreated>(0).Resource;
+                var snapShotpersisted = transactionResult.GetOperationResultAtIndex<SnapshotCreated>(1).Resource;
+                Balance = snapShotpersisted.Payload.Balance;
+            }
+            else
+            {
+                throw new Exception(transactionResult.ErrorMessage);
+            }
+        }
 
         private static void ValidateMatchingAccountNumberAndEntityKey(string accountNumber)
         {
@@ -136,40 +173,6 @@ namespace BankApp.Actors
                 throw new InvalidOperationException("AccountNumber doesn't match the Entity Key");
             }
         }
-        public async Task CreateSnapshot()
-        {
-
-            Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
-            MetadataCreated metadataCreated = await container.ReadItemAsync<MetadataCreated>("_metadata", new PartitionKey(Entity.Current.EntityKey)).ConfigureAwait(false);
-
-            Snapshot newSnapshot = null;// ReplayFromLastSnapshot(metadataCreated.Payload.LastSnapshot);
-
-            var snapshotCreatedEvent = new SnapshotCreated()
-            {
-                Payload = newSnapshot,
-                EventType = "SnapshotCreated",
-                Version = metadataCreated.Payload.LastSnapshot + 1,
-                Timestamp = DateTime.UtcNow,
-                Id = Guid.NewGuid().ToString(),
-                PartitionKey = Entity.Current.EntityKey
-
-            };
-
-            metadataCreated.Payload.LastSnapshot = snapshotCreatedEvent.Version;
-
-            var batch = container.CreateTransactionalBatch(new PartitionKey(Entity.Current.EntityKey))
-                                 .ReplaceItem<MetadataCreated>(metadataCreated.Id, metadataCreated)
-                                 .CreateItem<SnapshotCreated>(snapshotCreatedEvent);
-
-            TransactionalBatchResponse transactionResult = await batch.ExecuteAsync()
-                                                                      .ConfigureAwait(false);
-
-            if (!transactionResult.IsSuccessStatusCode)
-            {
-                throw new Exception(transactionResult.ErrorMessage);
-            }
-        }
-
         //private async Task<Snapshot> ReplayFromLastSnapshot(int lastSnapshot)
         //{
 
@@ -232,21 +235,38 @@ namespace BankApp.Actors
                 {
                     if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
                     {
-                        var metadata = new MetadataCreated()
+                        Metadata metadata = new Metadata()
                         {
-                            PartitionKey = Entity.Current.EntityKey,
-                            Timestamp = DateTime.UtcNow,
-                            Version = 0,
-                            Payload = new Metada()
-                            {
-                                AccountNumber = Entity.Current.EntityKey,
-                                LastSequence = 0,
-                                LastSnapshot = 0
-                            }
+                            AccountNumber = Entity.Current.EntityKey,
+                            LastSequence = 0
                         };
 
-                        var result = container.CreateItemAsync(metadata, new PartitionKey(Entity.Current.EntityKey)).GetAwaiter().GetResult();
-                        metadataCreated = result.Resource;
+                        var metadatCreatedEvent = MetadataCreated.Create(metadata, 0);
+
+                        Account account = new Account()
+                        {
+                            AccountNumber = Entity.Current.EntityKey
+                        };
+
+                        var accountCreatedEvent = AccountCreated.Create(account, 1);
+
+                        var batch = container.CreateTransactionalBatch(new PartitionKey(Entity.Current.EntityKey))
+                                          .UpsertItem(metadatCreatedEvent)
+                                          .UpsertItem(accountCreatedEvent);
+
+                        TransactionalBatchResponse transactionResult = batch.ExecuteAsync()
+                                                                            .GetAwaiter()
+                                                                            .GetResult();
+
+                        if (transactionResult.IsSuccessStatusCode)
+                        {
+                            metadataCreated = transactionResult.GetOperationResultAtIndex<MetadataCreated>(0).Resource;
+                            accountCreated = transactionResult.GetOperationResultAtIndex<AccountCreated>(1).Resource;
+                        }
+                        else
+                        {
+                            throw new CosmosException("batch failed", transactionResult.StatusCode, 404, "1", 1);
+                        }
                     }
                     else
                     {
@@ -254,7 +274,7 @@ namespace BankApp.Actors
                     }
                 }
 
-                ctx.SetState(new AccountHandler(cosmosClient) { State = new State() { Account = accountCreated, Balance = 0, Metadata = metadataCreated } });
+                ctx.SetState(new AccountHandler(cosmosClient) { State = metadataCreated  });
             }
             return ctx.DispatchAsync<AccountHandler>();
         }

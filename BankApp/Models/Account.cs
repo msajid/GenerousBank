@@ -7,7 +7,6 @@ namespace BankApp.Models
     public class Account
     {
         public string AccountNumber { get; set; }
-        public string Owner { get; set; }
     }
 
 }

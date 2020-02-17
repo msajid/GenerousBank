@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace BankApp.Events
 {
-    public class DepositPerformed
+    public class DepositPerformed 
     {
         public string Id { get; set; }
         public int Version { get; set; }

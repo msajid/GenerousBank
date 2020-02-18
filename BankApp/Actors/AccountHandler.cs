@@ -71,21 +71,49 @@ namespace BankApp.Actors
             if (!ctx.HasState)
             {
                 Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
-                var markerAndBalance = CreateIfNotExistsAndReadMarker(container).GetAwaiter().GetResult();
-                ctx.SetState(new AccountHandler(cosmosClient) { Marker = markerAndBalance.maker, Balance = markerAndBalance.balance });
+                var marker = CreateIfNotExistsAndReadMarker(container).GetAwaiter().GetResult();
+                int balance =  ReplayFromSnapshot(container).GetAwaiter().GetResult();
+
+                ctx.SetState(new AccountHandler(cosmosClient) { Marker = marker, Balance = balance });
             }
             return ctx.DispatchAsync<AccountHandler>();
         }
 
-        private static async Task<(MarkerCreated maker, int balance)> CreateIfNotExistsAndReadMarker(Container container)
+        private async Task<TEvent> PerformTransactionAsync<TEvent, TPayload>(TEvent parameter) where TEvent : ITransaction<TPayload>
         {
+            Marker.Payload.LastSequence = parameter.Version;
+
+            var batchOptions = new TransactionalBatchItemRequestOptions()
+            {
+                IfMatchEtag = Marker.Etag
+            };
+
+            Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
+            var batch = container.CreateTransactionalBatch(new PartitionKey(Entity.Current.EntityKey))
+                                 .ReplaceItem<MarkerCreated>(Marker.Id, Marker, batchOptions)
+                                 .UpsertItem<TEvent>(parameter);
+
+            TransactionalBatchResponse transactionResult = await batch.ExecuteAsync()
+                                                                      .ConfigureAwait(false);
+
+            if (transactionResult.IsSuccessStatusCode)
+            {
+                Marker = transactionResult.GetOperationResultAtIndex<MarkerCreated>(0).Resource;
+                var transactionPersisted = transactionResult.GetOperationResultAtIndex<TEvent>(1).Resource;
+                return transactionPersisted;
+            }
+            else
+            {
+                throw new Exception(transactionResult.ErrorMessage);
+            }
+        }
+
+        private async Task<MarkerCreated> CreateIfNotExistsAndReadMarker(Container container)
+        {
+            MarkerCreated markerCreatedEvent;
             try
             {
-                MarkerCreated markerCreatedEvent = container.ReadItemAsync<MarkerCreated>("_metadata", new PartitionKey(Entity.Current.EntityKey)).GetAwaiter().GetResult();
-
-                int balance = await ReplayFromSnapshot(container).ConfigureAwait(false);
-
-                return (markerCreatedEvent, balance);
+                markerCreatedEvent = await container.ReadItemAsync<MarkerCreated>("_metadata", new PartitionKey(Entity.Current.EntityKey)).ConfigureAwait(false);
             }
             catch (CosmosException ex)
             {
@@ -95,19 +123,18 @@ namespace BankApp.Actors
                     {
                         LastSequence = 0
                     };
-                    MarkerCreated markerCreatedEvent = await container.CreateItemAsync(MarkerCreated.Create(marker, 0, Entity.Current.EntityKey), new PartitionKey(Entity.Current.EntityKey)).ConfigureAwait(false);
-                    return (markerCreatedEvent, 0);
+                    markerCreatedEvent = await container.CreateItemAsync(MarkerCreated.Create(marker, 0, Entity.Current.EntityKey), new PartitionKey(Entity.Current.EntityKey)).ConfigureAwait(false);
                 }
                 else
                 {
                     throw;
                 }
             }
-
+            return markerCreatedEvent;
 
         }
 
-        private static async Task<int> ReplayFromSnapshot(Container container)
+        private async Task<int> ReplayFromSnapshot(Container container)
         {
             int balance = 0;
 
@@ -147,35 +174,6 @@ namespace BankApp.Actors
             }
 
             return balance;
-        }
-
-        private async Task<TEvent> PerformTransactionAsync<TEvent, TPayload>(TEvent parameter) where TEvent : ITransaction<TPayload>
-        {
-            Marker.Payload.LastSequence = parameter.Version;
-
-            var batchOptions = new TransactionalBatchItemRequestOptions()
-            {
-                IfMatchEtag = Marker.Etag
-            };
-
-            Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
-            var batch = container.CreateTransactionalBatch(new PartitionKey(Entity.Current.EntityKey))
-                                 .ReplaceItem<MarkerCreated>(Marker.Id, Marker, batchOptions)
-                                 .UpsertItem<TEvent>(parameter);
-
-            TransactionalBatchResponse transactionResult = await batch.ExecuteAsync()
-                                                                      .ConfigureAwait(false);
-
-            if (transactionResult.IsSuccessStatusCode)
-            {
-                Marker = transactionResult.GetOperationResultAtIndex<MarkerCreated>(0).Resource;
-                var transactionPersisted = transactionResult.GetOperationResultAtIndex<TEvent>(1).Resource;
-                return transactionPersisted;
-            }
-            else
-            {
-                throw new Exception(transactionResult.ErrorMessage);
-            }
         }
 
     }

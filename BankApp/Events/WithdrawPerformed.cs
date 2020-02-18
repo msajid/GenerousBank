@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace BankApp.Events
 {
-    public class WithdrawPerformed
+    public class WithdrawPerformed : ITransaction<Withdraw>
     {
         public string Id { get; set; }
         public int Version { get; set; }
@@ -13,7 +13,7 @@ namespace BankApp.Events
         public DateTime Timestamp { get; set; }
         public Withdraw Payload { get; set; }
 
-        public static WithdrawPerformed Create(Withdraw withdraw, int version)
+        public static WithdrawPerformed Create(Withdraw withdraw, int version, string partitionKey)
         {
             return new WithdrawPerformed()
             {
@@ -22,7 +22,7 @@ namespace BankApp.Events
                 Version = version,
                 Timestamp = DateTime.UtcNow,
                 Id = version.ToString(CultureInfo.InvariantCulture),
-                PartitionKey = withdraw?.AccountNumber
+                PartitionKey = partitionKey
 
             };
         }

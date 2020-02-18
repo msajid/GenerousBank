@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace BankApp.Events
 {
-    public class DepositPerformed 
+    public class DepositPerformed : ITransaction<Deposit>
     {
         public string Id { get; set; }
         public int Version { get; set; }
@@ -13,7 +13,7 @@ namespace BankApp.Events
         public DateTime Timestamp { get; set; }
         public Deposit Payload { get; set; }
 
-        public static DepositPerformed Create(Deposit deposit, int version)
+        public static DepositPerformed Create(Deposit deposit, int version, string partitionKey)
         {
             return new DepositPerformed()
             {
@@ -22,7 +22,7 @@ namespace BankApp.Events
                 Version = version,
                 Timestamp = DateTime.UtcNow,
                 Id = version.ToString(CultureInfo.InvariantCulture),
-                PartitionKey = deposit?.AccountNumber
+                PartitionKey = partitionKey
             };
         }
     }

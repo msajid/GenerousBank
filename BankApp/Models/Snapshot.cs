@@ -6,7 +6,6 @@ namespace BankApp.Models
 {
     public class Snapshot
     {
-        public string AccountNumber { get; set; }
         public int Balance { get; set; }
 
     }

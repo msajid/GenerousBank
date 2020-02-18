@@ -4,9 +4,8 @@ using System.Text;
 
 namespace BankApp.Models
 {
-    public class Metadata
+    public class Marker
     {
-        public string AccountNumber { get; set; }
         public int LastSequence { get; set; }
        
     }

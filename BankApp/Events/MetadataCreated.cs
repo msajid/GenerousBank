@@ -5,41 +5,30 @@ using System.Globalization;
 
 namespace BankApp.Events
 {
-    public class MetadataCreated 
+    public class MarkerCreated 
     {
         public string Id { get; set; } = "_metadata";
         public string PartitionKey { get; set; }
         public int Version { get; set; }
-        public string EventType { get; set; } = nameof(MetadataCreated);
+        public string EventType { get; set; } = nameof(MarkerCreated);
         public DateTime Timestamp { get; set; }
-        public Metadata Payload { get; set; }
+        public Marker Payload { get; set; }
 
         [JsonProperty("_etag")]
         public string Etag { get; set; }
 
-        public static MetadataCreated Create(Metadata metadata, int version)
+        public static MarkerCreated Create(Marker metadata, int version, string partitionKey)
         {
-            return new MetadataCreated()
+            return new MarkerCreated()
             {
                 Payload = metadata,
-                EventType = nameof(MetadataCreated),
+                EventType = nameof(MarkerCreated),
                 Version = version,
                 Timestamp = DateTime.UtcNow,
-                PartitionKey = metadata?.AccountNumber
+                PartitionKey = partitionKey
             };
         }
 
-        public static MetadataCreated Clone(MetadataCreated original)
-        {
-            return new MetadataCreated()
-            {
-                Id = original.Id,
-                Payload = original.Payload,
-                EventType = nameof(MetadataCreated),
-                Version = original.Version,
-                Timestamp = DateTime.UtcNow,
-                PartitionKey = original.PartitionKey,
-            };
-        }
+        
     }
 }

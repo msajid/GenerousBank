@@ -4,7 +4,7 @@ using System.Globalization;
 
 namespace BankApp.Events
 {
-    public class SnapshotCreated
+    public class SnapshotCreated : ITransaction<Snapshot>
     {
         public string Id { get; set; }
         public int Version { get; set; }
@@ -13,7 +13,7 @@ namespace BankApp.Events
         public DateTime Timestamp { get; set; }
         public Snapshot Payload { get; set; }
 
-        public static SnapshotCreated Create(Snapshot snapshot, int version)
+        public static SnapshotCreated Create(Snapshot snapshot, int version, string partitionKey)
         {
             return new SnapshotCreated()
             {
@@ -22,7 +22,7 @@ namespace BankApp.Events
                 Version = version,
                 Timestamp = DateTime.UtcNow,
                 Id = version.ToString(CultureInfo.InvariantCulture),
-                PartitionKey = snapshot?.AccountNumber
+                PartitionKey = partitionKey
             };
         }
     }

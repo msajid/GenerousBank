@@ -72,7 +72,7 @@ namespace BankApp.Actors
             {
                 Container container = cosmosClient.GetContainer("BankDB", "GenerousBank");
                 var marker = CreateIfNotExistsAndReadMarker(container).GetAwaiter().GetResult();
-                int balance =  ReplayFromSnapshot(container).GetAwaiter().GetResult();
+                int balance = ReplayFromSnapshot(container).GetAwaiter().GetResult();
 
                 ctx.SetState(new AccountHandler(cosmosClient) { Marker = marker, Balance = balance });
             }
@@ -147,30 +147,34 @@ namespace BankApp.Actors
             {
                 FeedResponse<SnapshotCreated> snapshotItemFeed = await setIteratorSnapshot.ReadNextAsync().ConfigureAwait(false);
                 var snapshot = snapshotItemFeed.Resource.FirstOrDefault();
-
-                balance = snapshot.Payload.Balance;
-
-                QueryDefinition everythingAfterSnapshotQuery = new QueryDefinition("SELECT * FROM c where c.version > @snapshot and c.partitionKey = @partitionKey order by c.id")
-                                                              .WithParameter("@snapshot", snapshot.Version)
-                                                              .WithParameter("@partitionKey", Entity.Current.EntityKey);
-
-                FeedIterator<dynamic> setIteratorReplay = container.GetItemQueryIterator<dynamic>(everythingAfterSnapshotQuery, requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(Entity.Current.EntityKey) });
-                while (setIteratorReplay.HasMoreResults)
+                if (snapshot != null)
                 {
-                    foreach (FeedResponse<dynamic> replayItemFeed in await setIteratorReplay.ReadNextAsync().ConfigureAwait(false))
+                    balance = snapshot.Payload.Balance;
+
+                    QueryDefinition everythingAfterSnapshotQuery = new QueryDefinition("SELECT * FROM c where c.version > @snapshot and c.partitionKey = @partitionKey order by c.id")
+                                                                  .WithParameter("@snapshot", snapshot.Version)
+                                                                  .WithParameter("@partitionKey", Entity.Current.EntityKey);
+
+                    FeedIterator<dynamic> setIteratorReplay = container.GetItemQueryIterator<dynamic>(everythingAfterSnapshotQuery, requestOptions: new QueryRequestOptions { PartitionKey = new PartitionKey(Entity.Current.EntityKey) });
+                    while (setIteratorReplay.HasMoreResults)
                     {
-                        var replayItem = replayItemFeed.Resource.FirstOrDefault();
-                        if (replayItem.eventType.ToString() == "DepositPerformed")
+                        foreach (FeedResponse<dynamic> replayItemFeed in await setIteratorReplay.ReadNextAsync().ConfigureAwait(false))
                         {
-                            balance += (int)replayItem.payload.amount;
-                        }
-                        else if (replayItem.eventType.ToString() == "WithdrawPerformed")
-                        {
-                            balance -= (int)replayItem.payload.amount;
+                            var replayItem = replayItemFeed.Resource.FirstOrDefault();
+                            if (replayItem != null)
+                            {
+                                if (replayItem.eventType.ToString() == "DepositPerformed")
+                                {
+                                    balance += (int)replayItem.payload.amount;
+                                }
+                                else if (replayItem.eventType.ToString() == "WithdrawPerformed")
+                                {
+                                    balance -= (int)replayItem.payload.amount;
+                                }
+                            }
                         }
                     }
                 }
-
             }
 
             return balance;

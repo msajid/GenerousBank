@@ -1,0 +1,195 @@
+{
+	"info": {
+		"_postman_id": "c5edb81c-5779-4b46-99ed-b705c34dd324",
+		"name": "BankApp",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Get AccountState",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:7071/runtime/webhooks/durabletask/entities/AccountHandler/sajid",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7071",
+					"path": [
+						"runtime",
+						"webhooks",
+						"durabletask",
+						"entities",
+						"AccountHandler",
+						"sajid"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get All Entities",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:7071/runtime/webhooks/durabletask/entities/AccountHandler",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7071",
+					"path": [
+						"runtime",
+						"webhooks",
+						"durabletask",
+						"entities",
+						"AccountHandler"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "PerformDeposit",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"accountNumber\" : \"A123456\",\n\t\"amount\" : 10\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:7071/runtime/webhooks/durabletask/entities/AccountHandler/sajid?op=PerformDeposit",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7071",
+					"path": [
+						"runtime",
+						"webhooks",
+						"durabletask",
+						"entities",
+						"AccountHandler",
+						"sajid"
+					],
+					"query": [
+						{
+							"key": "op",
+							"value": "PerformDeposit"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "PerformWithdraw",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"accountNumber\" : \"A123456\",\n\t\"amount\" : 10\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:7071/runtime/webhooks/durabletask/entities/AccountHandler/sajid?op=PerformWithdraw",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7071",
+					"path": [
+						"runtime",
+						"webhooks",
+						"durabletask",
+						"entities",
+						"AccountHandler",
+						"sajid"
+					],
+					"query": [
+						{
+							"key": "op",
+							"value": "PerformWithdraw"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "CreateSnapshot",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"name": "Content-Type",
+						"type": "text",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"accountNumber\" : \"A123456\",\n\t\"amount\" : 10\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:7071/runtime/webhooks/durabletask/entities/AccountHandler/sajid?op=CreateSnapshot",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "7071",
+					"path": [
+						"runtime",
+						"webhooks",
+						"durabletask",
+						"entities",
+						"AccountHandler",
+						"sajid"
+					],
+					"query": [
+						{
+							"key": "op",
+							"value": "CreateSnapshot"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"protocolProfileBehavior": {}
+}
